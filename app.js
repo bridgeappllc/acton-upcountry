@@ -15,12 +15,12 @@ const TILES=[
  ['handbook','📖','Parent Handbook','t1'],['pickup','🚗','Pickup & Drop-off','t2'],
  ['bulletin','📌','Bulletin Board','t4'],['calendar','📅','School Calendar','t1'],['fair','💡','Business Fair','t2'],['attendance','🗓️','Attendance','t3'],
  ['emergency','🚑','Emergency Contacts','t5'],['authorized','✅','Authorized Pickup','t1'],
- ['carpool','🚙','Carpool','t2'],['tuition','💳','Tuition (TUIO)','t4'],
+ ['carpool','🚙','Carpool','t2'],['directory','👥','Parent Directory','t3'],['tuition','💳','Tuition (TUIO)','t4'],
  ['parents','🦉','Acton Parents','t3'],['journey','🧭','Journey Tracker','t5']];
 const CAL=[['2026-08-13',null,'Welcome Celebration',0],['2026-08-17',null,'First Day of School',0],['2026-10-05','2026-10-08','Fall Break',1],['2026-11-25','2026-11-26','Thanksgiving Break',1],['2026-12-21','2027-01-03','Winter Break',1],['2027-02-15','2027-02-18','Mid-Winter Break',1],['2027-03-01',null,'Acton Children’s Business Fair — date TBD (tap for details)',0,'March 2027'],['2027-04-05','2027-04-08','Spring Break',1],['2027-05-27',null,'Last Day of School',0]];
 const calDate=c=>c[4]||(fmtDate(c[0])+(c[1]?' – '+fmtDate(c[1]):''));
 const nextCal=()=>CAL.find(c=>(c[1]||c[0])>=today()&&!c[4]);
-const TITLES=Object.fromEntries(TILES.map(t=>[t[0],t[2]]));TITLES.login='Sign In';TITLES.fair='Children’s Business Fair';TITLES.calendar='School Calendar 2026–27';TITLES.account='My Account';
+const TITLES=Object.fromEntries(TILES.map(t=>[t[0],t[2]]));TITLES.login='Sign In';TITLES.fair='Children’s Business Fair';TITLES.calendar='School Calendar 2026–27';TITLES.account='My Account';TITLES.directory='Parent Directory';
 
 function setBar(title){const b=$('#bar');if(!title){b.classList.add('hidden');return}b.classList.remove('hidden');$('#title').textContent=title}
 $('#back').onclick=()=>{history.length>1?history.back():location.hash=''};
@@ -59,12 +59,16 @@ V.login=(next)=>{
   draw()};
 
 V.account=async()=>{ if(needLogin('account'))return;
-  app.innerHTML=`<div class="card"><h2>My Family</h2><form id="f"><label>Parent name(s)</label><input name="parent_name" value="${esc(profile?.parent_name)}">
-  <label>Phone</label><input name="phone" type="tel" value="${esc(profile?.phone)}"><label>My Learner(s)</label><input name="students" placeholder="e.g. Kai, Leilani" value="${esc(profile?.students)}">
+  const pr=profile||{};app.innerHTML=`<div class="card"><h2>My Parent Profile</h2><form id="f"><label>Parent name(s)</label><input name="parent_name" value="${esc(pr.parent_name)}">
+  <label>Phone</label><input name="phone" type="tel" value="${esc(pr.phone)}"><label>Email</label><input name="email" type="email" value="${esc(pr.email||session.user.email)}"><label>My Learner(s)</label><input name="students" placeholder="e.g. Kai, Leilani" value="${esc(pr.students)}">
+  <label>Note (optional)</label><textarea name="note" placeholder="e.g. Happy to help with carpools">${esc(pr.note)}</textarea>
+  <label>Parent Directory visibility</label><div class="seg"><button type="button" data-s="0" class="${pr.shared?'':'on'}">🔒 Private</button><button type="button" data-s="1" class="${pr.shared?'on':''}">👥 Shared</button></div>
+  <p class="muted" id="vis">${pr.shared?'Other signed-in parents can see this profile in the Parent Directory.':'Only you and school admins can see this profile.'}</p>
   <button class="btn">Save</button></form></div>
   <div class="card"><h3>Change password</h3><form id="pw"><input name="password" type="password" minlength="8" required placeholder="New password"><button class="btn alt">Update password</button></form></div>
   <button class="btn danger" id="out">Sign out</button>`;
-  $('#f').onsubmit=async e=>{e.preventDefault();const d=form(e.target);const {error}=await sb.from('profiles').upsert({id:session.user.id,email:session.user.email,...d,updated_at:new Date().toISOString()});if(error)return toast(error.message);profile={...profile,...d};toast('Saved')};
+  let shared=!!pr.shared;app.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{shared=b.dataset.s==='1';app.querySelectorAll('[data-s]').forEach(x=>x.classList.toggle('on',x===b));$('#vis').textContent=shared?'Other signed-in parents will see this profile in the Parent Directory.':'Only you and school admins can see this profile.'});
+  $('#f').onsubmit=async e=>{e.preventDefault();const d={...form(e.target),shared};const {error}=await sb.from('profiles').upsert({id:session.user.id,...d,updated_at:new Date().toISOString()});if(error)return toast(error.message);profile={...profile,...d};toast('Saved')};
   $('#pw').onsubmit=async e=>{e.preventDefault();const {error}=await sb.auth.updateUser({password:form(e.target).password});toast(error?error.message:'Password updated');e.target.reset()};
   $('#out').onclick=async()=>{await sb.auth.signOut();location.hash=''}};
 
@@ -104,6 +108,13 @@ V.fair=async()=>{const {data:pg,error}=await sb.from('pages').select('*').eq('sl
  app.innerHTML=`<div class="card"><h2>${esc(pg.title)}</h2>${pg.subtitle?`<div class="ev-date">${esc(pg.subtitle)}</div>`:''}<p style="white-space:pre-wrap">${esc(pg.body)}</p></div><a class="btn ghost" href="#calendar">See the School Calendar</a>
  ${isAdmin?`<div class="card"><h3>Edit this page (admin)</h3><form id="f"><label>Title</label><input name="title" required value="${esc(pg.title)}"><label>Date line</label><input name="subtitle" value="${esc(pg.subtitle)}"><label>Description</label><textarea name="body" style="min-height:160px">${esc(pg.body)}</textarea><button class="btn">Save changes</button></form></div>`:''}`;
  if(isAdmin)$('#f').onsubmit=async e=>{e.preventDefault();const {error}=await sb.from('pages').update({...form(e.target),updated_at:new Date().toISOString()}).eq('slug','business-fair');if(error)return toast(error.message);toast('Saved');V.fair()}};
+V.directory=async()=>{ if(needLogin('directory'))return;
+ app.innerHTML=`<p class="muted">Families who chose <b>Shared</b> in My Account. ${profile?.shared?'Your profile is shared.':'Your profile is private — <a href="#account">share it</a> to appear here.'}</p><input id="q" type="search" placeholder="Search names, Learners…"><div id="dl"><p class="muted">Loading…</p></div>`;
+ const {data,error}=await sb.from('profiles').select('id,parent_name,phone,email,students,note,shared').order('parent_name');if(error)throw error;
+ const list=data.filter(x=>x.shared||isAdmin);
+ const draw=t=>{const f=list.filter(x=>!t||[x.parent_name,x.students,x.note].join(' ').toLowerCase().includes(t));
+  $('#dl').innerHTML=f.length?f.map(x=>`<div class="card"><h3>${esc(x.parent_name||'Parent')}</h3>${x.students?`<div>Learner(s): <b>${esc(x.students)}</b></div>`:''}${x.note?`<p class="muted">${esc(x.note)}</p>`:''}${!x.shared?'<span class="pill" style="background:var(--clay);color:#fff">Private · admin view</span><br>':''}${x.phone?`<a class="btn sm" href="tel:${esc(x.phone)}">📞 ${esc(x.phone)}</a>`:''}${x.email?`<a class="btn alt sm" href="mailto:${esc(x.email)}">✉︎ Email</a>`:''}</div>`).join(''):'<div class="card">No shared profiles yet.</div>'};
+ draw('');$('#q').oninput=e=>draw(e.target.value.trim().toLowerCase())};
 // BULLETIN
 V.bulletin=async()=>{
   app.innerHTML=`${isAdmin?`<div class="card"><h2>Post an event</h2><form id="f"><label>Title</label><input name="title" required><label>Date</label><input name="event_date" type="date" required><label>Details</label><textarea name="body"></textarea><button class="btn">Post to Bulletin Board</button></form></div>`:''}
