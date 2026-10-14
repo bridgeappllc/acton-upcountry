@@ -18,7 +18,7 @@ const TILES=[
 const calDate=c=>c[4]||(fmtDate(c[0])+(c[1]?' – '+fmtDate(c[1]):''));
 let CAL=null;const getCal=async()=>{if(!CAL){const {data,error}=await sb.from('calendar_items').select('*').order('start_date');if(error)throw error;CAL=data.map(c=>[c.start_date,c.end_date,c.title,c.is_off,c.label])}return CAL};
 const nextCal=()=>(CAL||[]).find(c=>(c[1]||c[0])>=today()&&!c[4]);
-const TITLES=Object.fromEntries(TILES.map(t=>[t[0],t[2]]));TITLES.login='Sign In';TITLES.fair='Children’s Business Fair';TITLES.calendar='Learning Center Calendar 2026–27';TITLES.account='My Account';TITLES.members='Members';TITLES.directory='Parent Directory';
+const TITLES=Object.fromEntries(TILES.map(t=>[t[0],t[2]]));TITLES.login='Sign In';TITLES.fair='Children’s Business Fair';TITLES.calendar='Learning Center Calendar 2026–27';TITLES.account='My Account';TITLES.members='Members';TITLES.allec='All Emergency Contacts';TITLES.directory='Parent Directory';
 
 function setBar(title){const b=$('#bar');if(!title){b.classList.add('hidden');return}b.classList.remove('hidden');$('#title').textContent=title}
 $('#back').onclick=()=>{history.length>1?history.back():location.hash=''};
@@ -42,6 +42,22 @@ V.signedOut=()=>{app.innerHTML=`<div class="hero"><img src="logo.png" alt="Acton
 V.waiting=()=>{app.innerHTML=`<div class="hero"><img src="logo.png" alt="Acton Upcountry"></div><div class="card">${status==='removed'?`<h2>Access removed</h2><p>Your access to the Acton Upcountry Parent app has been removed. If you think this is a mistake, email <a href="mailto:actonupcountry@gmail.com">actonupcountry@gmail.com</a>.</p>`:`<h2>Waiting for approval</h2><p>Mahalo for signing up, ${esc(profile?.parent_name||'')}! The learning center will review your account shortly. You’ll have full access once you're approved.</p><button class="btn alt" id="chk">Check again</button>`}
   <p class="muted">Signed in as ${esc(session.user.email)}</p><button class="btn danger" id="out">Sign out</button></div>`;
   const c=$('#chk');if(c)c.onclick=async()=>{await loadUser();route()};$('#out').onclick=async()=>{await sb.auth.signOut();session=null;location.hash='';route()}};
+V.allec=async()=>{ if(!isAdmin){location.hash='';return}
+  const [{data:ec,error:e1},{data:pr,error:e2}]=await Promise.all([sb.from('emergency_contacts').select('*').order('student_name'),sb.from('profiles').select('id,parent_name,email,phone')]);if(e1||e2)throw e1||e2;
+  const P=Object.fromEntries(pr.map(x=>[x.id,x]));
+  const rows=ec.map(x=>({...x,parent:P[x.user_id]?.parent_name||'',pemail:P[x.user_id]?.email||'',pphone:P[x.user_id]?.phone||''}));
+  app.innerHTML=`<p class="muted">${rows.length} contact${rows.length==1?'':'s'} from all families · live from the database</p><input id="q" type="search" placeholder="Search learner, parent, contact, phone…"><button class="btn alt" id="csv">⬇︎ Export CSV</button><div id="ecl"></div>`;
+  const fmt=t=>t?new Date(t).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}):'';
+  const tel=p=>p?`<a href="tel:${esc(p)}">${esc(p)}</a>`:'';
+  const draw=t=>{const f=rows.filter(x=>!t||[x.student_name,x.parent,x.pemail,x.contact_name,x.relationship,x.phone,x.alt_phone,x.notes].join(' ').toLowerCase().includes(t));
+    const g={};f.forEach(x=>{const k=x.user_id+'|'+x.student_name;(g[k]=g[k]||[]).push(x)});
+    $('#ecl').innerHTML=Object.values(g).map(L=>`<div class="card"><span class="pill">${esc(L[0].student_name)}</span><h3>${esc(L[0].parent||'(parent name not set)')}</h3><div class="muted">${esc(L[0].pemail)}${L[0].pphone?' · '+tel(L[0].pphone):''}</div>
+      ${L.map(x=>`<div style="border-top:1px solid #ddd3c2;margin-top:10px;padding-top:8px"><b>${esc(x.contact_name)}</b>${x.relationship?` · ${esc(x.relationship)}`:''}<div>${tel(x.phone)}${x.alt_phone?' · '+tel(x.alt_phone):''}</div>${x.notes?`<div class="muted">${esc(x.notes)}</div>`:''}<div class="muted" style="font-size:.8rem">Updated ${fmt(x.updated_at||x.created_at)}</div></div>`).join('')}</div>`).join('')||'<div class="card">No emergency contacts found.</div>'};
+  draw('');$('#q').oninput=e=>draw(e.target.value.trim().toLowerCase());
+  $('#csv').onclick=()=>{const H=['Learner','Parent','Parent email','Parent phone','Contact','Relationship','Phone','Alt phone','Notes','Last updated'];
+    const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+    const csv=[H,...rows.map(x=>[x.student_name,x.parent,x.pemail,x.pphone,x.contact_name,x.relationship,x.phone,x.alt_phone,x.notes,x.updated_at||x.created_at])].map(r=>r.map(q).join(',')).join('\n');
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='emergency-contacts-'+today()+'.csv';a.click()}};
 V.members=async()=>{ if(!isAdmin){location.hash='';return}
   const {data,error}=await sb.from('profiles').select('id,parent_name,email,phone,students,status,updated_at').order('parent_name');if(error)throw error;
   const grp=k=>data.filter(x=>x.status===k);
@@ -54,7 +70,7 @@ V.home=async()=>{ try{await getCal()}catch{}
   app.innerHTML=`<div class="hero"><img src="logo.png" alt="Acton Upcountry — Courage • Character • Calling"></div>
   ${(()=>{const n=nextCal();return n?`<a href="#calendar" class="card" style="display:block;text-decoration:none;color:inherit;border-left:6px solid ${n[3]?'var(--ochre)':'var(--rust)'}"><span class="muted">Next up</span><div class="ev-date">${calDate(n)}</div><b>${n[3]?'DAY OFF · ':''}${esc(n[2])}</b></a>`:''})()}
   <div class="grid">${TILES.map(([k,ic,t,c])=>`<a class="tile ${c}" href="#${k}"><span class="ic">${ic}</span>${t}</a>`).join('')}</div>
-  <div class="foot">${session?`<p class="muted">Signed in as ${esc(session.user.email)}${isAdmin?' · <b>Admin</b>':''}</p>${isAdmin?'<a class="btn" href="#members">👥 Members (approve / remove)</a>':''}<a class="btn ghost" href="#account">My Account</a>`:`<a class="btn alt" href="#login">Parent Sign In</a>`}
+  <div class="foot">${session?`<p class="muted">Signed in as ${esc(session.user.email)}${isAdmin?' · <b>Admin</b>':''}</p>${isAdmin?'<a class="btn" href="#members">👥 Members (approve / remove)</a><a class="btn alt" href="#allec">🚑 All Emergency Contacts</a>':''}<a class="btn ghost" href="#account">My Account</a>`:`<a class="btn alt" href="#login">Parent Sign In</a>`}
   <p class="muted">683 Naalae Road, Kula, HI · <a href="tel:8083446923">808.344.6923</a></p></div>`};
 
 V.login=(next)=>{
