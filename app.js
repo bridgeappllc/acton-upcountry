@@ -13,11 +13,14 @@ function form(el){return Object.fromEntries([...new FormData(el)].map(([k,v])=>[
 
 const TILES=[
  ['handbook','📖','Parent Handbook','t1'],['pickup','🚗','Pickup & Drop-off','t2'],
- ['bulletin','📌','Bulletin Board','t4'],['attendance','🗓️','Attendance','t3'],
+ ['bulletin','📌','Bulletin Board','t4'],['calendar','📅','School Calendar','t1'],['attendance','🗓️','Attendance','t3'],
  ['emergency','🚑','Emergency Contacts','t5'],['authorized','✅','Authorized Pickup','t1'],
  ['carpool','🚙','Carpool','t2'],['tuition','💳','Tuition (TUIO)','t4'],
  ['parents','🦉','Acton Parents','t3'],['journey','🧭','Journey Tracker','t5']];
-const TITLES=Object.fromEntries(TILES.map(t=>[t[0],t[2]]));TITLES.login='Sign In';TITLES.account='My Account';
+const CAL=[['2026-08-13',null,'Welcome Celebration',0],['2026-08-17',null,'First Day of School',0],['2026-10-05','2026-10-08','Fall Break',1],['2026-11-25','2026-11-26','Thanksgiving Break',1],['2026-12-21','2027-01-03','Winter Break',1],['2027-02-15','2027-02-18','Mid-Winter Break',1],['2027-03-01',null,'Acton Children’s Business Fair — date TBD',0,'March 2027'],['2027-04-05','2027-04-08','Spring Break',1],['2027-05-27',null,'Last Day of School',0]];
+const calDate=c=>c[4]||(fmtDate(c[0])+(c[1]?' – '+fmtDate(c[1]):''));
+const nextCal=()=>CAL.find(c=>(c[1]||c[0])>=today()&&!c[4]);
+const TITLES=Object.fromEntries(TILES.map(t=>[t[0],t[2]]));TITLES.login='Sign In';TITLES.calendar='School Calendar 2026–27';TITLES.account='My Account';
 
 function setBar(title){const b=$('#bar');if(!title){b.classList.add('hidden');return}b.classList.remove('hidden');$('#title').textContent=title}
 $('#back').onclick=()=>{history.length>1?history.back():location.hash=''};
@@ -33,6 +36,7 @@ function needLogin(next){ if(session) return false;
 const V={};
 V.home=()=>{
   app.innerHTML=`<div class="hero"><img src="logo.png" alt="Acton Upcountry — Courage • Character • Calling"></div>
+  ${(()=>{const n=nextCal();return n?`<a href="#calendar" class="card" style="display:block;text-decoration:none;color:inherit;border-left:6px solid ${n[3]?'var(--ochre)':'var(--rust)'}"><span class="muted">Next up</span><div class="ev-date">${calDate(n)}</div><b>${n[3]?'NO SCHOOL · ':''}${esc(n[2])}</b></a>`:''})()}
   <div class="grid">${TILES.map(([k,ic,t,c])=>`<a class="tile ${c}" href="#${k}"><span class="ic">${ic}</span>${t}</a>`).join('')}</div>
   <div class="foot">${session?`<p class="muted">Signed in as ${esc(session.user.email)}${isAdmin?' · <b>Admin</b>':''}</p><a class="btn ghost" href="#account">My Account</a>`:`<a class="btn alt" href="#login">Parent Sign In</a>`}
   <p class="muted">683 Naalae Road, Kula, HI · <a href="tel:8083446923">808.344.6923</a></p></div>`};
@@ -92,6 +96,10 @@ V.pickup=()=>{app.innerHTML=`
   <p class="muted">If someone else is picking up, add them to your <a href="#authorized">Authorized Pickup list</a> and tell your Learner.</p></div>
  <a class="btn" href="#attendance">Report an absence or early pickup</a>`};
 
+V.calendar=()=>{app.innerHTML=`<p class="tag">School Calendar 2026–27</p>
+ <div class="card"><h3>Learners come Monday – Thursday</h3><p>Flexible drop-off <b>8:30 – 8:55 am</b><br>Pickup <b>2:30 – 2:55 pm</b></p></div>
+ ${CAL.map(c=>`<div class="card" style="${c[3]?'background:var(--ochre);color:var(--dg)':''}"><div class="ev-date" style="${c[3]?'color:var(--dg)':''}">${calDate(c)}</div><h3>${c[3]?'OFF · ':''}${esc(c[2])}</h3></div>`).join('')}
+ <p class="muted"><span class="pill" style="background:var(--ochre)">Golden</span> = no school (days off)</p>`};
 // BULLETIN
 V.bulletin=async()=>{
   app.innerHTML=`${isAdmin?`<div class="card"><h2>Post an event</h2><form id="f"><label>Title</label><input name="title" required><label>Date</label><input name="event_date" type="date" required><label>Details</label><textarea name="body"></textarea><button class="btn">Post to Bulletin Board</button></form></div>`:''}
