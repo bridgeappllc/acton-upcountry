@@ -1,11 +1,9 @@
 const SB_URL='https://xpgvkfojqtempupdrubx.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhwZ3ZrZm9qcXRlbXB1cGRydWJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5ODU2ODEsImV4cCI6MjEwNzU2MTY4MX0.-6UjWwXCflKaeAoSdUGzmzuXSzqOxA7qFmZYn1SFDXg';
 const sb=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
-const PDF='Acton-Upcountry-Parent-Handbook-2025-26.pdf';
-const LINKS={parents:'https://www.actonacademyparents.com/',tuio:'https://app.tuiopay.com/',journey:'https://apps.apple.com/app/id6753354988'};
 const $=s=>document.querySelector(s), app=$('#app');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let session=null, isAdmin=false, profile=null, HB=null;
+let session=null, isAdmin=false, profile=null, HB=null, status=null;
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3200)}
 const fmtDate=d=>d?new Date(d+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'}):'';
 const today=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
@@ -17,16 +15,20 @@ const TILES=[
  ['emergency','🚑','Emergency Contacts','t5'],['authorized','✅','Authorized Pickup','t1'],
  ['carpool','🚙','Carpool','t2'],['directory','👥','Parent Directory','t3'],['tuition','💳','Tuition (TUIO)','t4'],
  ['parents','🦉','Acton Parents','t3'],['journey','🧭','Journey Tracker','t5']];
-const CAL=[['2026-08-13',null,'Welcome Celebration',0],['2026-08-17',null,'First Day of School',0],['2026-10-05','2026-10-08','Fall Break',1],['2026-11-25','2026-11-26','Thanksgiving Break',1],['2026-12-21','2027-01-03','Winter Break',1],['2027-02-15','2027-02-18','Mid-Winter Break',1],['2027-03-01',null,'Acton Children’s Business Fair — date TBD (tap for details)',0,'March 2027'],['2027-04-05','2027-04-08','Spring Break',1],['2027-05-27',null,'Last Day of School',0]];
 const calDate=c=>c[4]||(fmtDate(c[0])+(c[1]?' – '+fmtDate(c[1]):''));
-const nextCal=()=>CAL.find(c=>(c[1]||c[0])>=today()&&!c[4]);
-const TITLES=Object.fromEntries(TILES.map(t=>[t[0],t[2]]));TITLES.login='Sign In';TITLES.fair='Children’s Business Fair';TITLES.calendar='School Calendar 2026–27';TITLES.account='My Account';TITLES.directory='Parent Directory';
+let CAL=null;const getCal=async()=>{if(!CAL){const {data,error}=await sb.from('calendar_items').select('*').order('start_date');if(error)throw error;CAL=data.map(c=>[c.start_date,c.end_date,c.title,c.is_off,c.label])}return CAL};
+const nextCal=()=>(CAL||[]).find(c=>(c[1]||c[0])>=today()&&!c[4]);
+const TITLES=Object.fromEntries(TILES.map(t=>[t[0],t[2]]));TITLES.login='Sign In';TITLES.fair='Children’s Business Fair';TITLES.calendar='School Calendar 2026–27';TITLES.account='My Account';TITLES.members='Members';TITLES.directory='Parent Directory';
 
 function setBar(title){const b=$('#bar');if(!title){b.classList.add('hidden');return}b.classList.remove('hidden');$('#title').textContent=title}
 $('#back').onclick=()=>{history.length>1?history.back():location.hash=''};
 
 async function route(){
   const [r,arg]=(location.hash.slice(1)||'home').split('/');window.scrollTo(0,0);
+  if(session){const {data:st}=await sb.rpc('my_status');if(st&&st!==status){status=st}}
+  const open=['login','account'];
+  if(!session&&r!=='login'){setBar('');return V.signedOut()}
+  if(session&&status!=='approved'&&!open.includes(r)){setBar('');return V.waiting()}
   const f=V[r]||V.home; setBar(r==='home'?'':TITLES[r]||'');
   try{await f(arg)}catch(e){console.error(e);app.innerHTML=`<div class="card">Something went wrong: ${esc(e.message)}</div>`}
 }
@@ -34,11 +36,25 @@ function needLogin(next){ if(session) return false;
   app.innerHTML=`<div class="card"><h2>Parents sign in</h2><p>This section is private to your family. Please sign in or create an account.</p><a class="btn" href="#login/${next}">Sign in / Create account</a></div>`; return true }
 
 const V={};
-V.home=()=>{
+V.signedOut=()=>{app.innerHTML=`<div class="hero"><img src="logo.png" alt="Acton Upcountry — Courage • Character • Calling"></div>
+  <div class="card"><h2>Welcome, Acton Upcountry families</h2><p>This app is private to our school community. Sign in, or create an account and the school will approve it.</p>
+  <a class="btn" href="#login">Sign in / Create account</a></div>`};
+V.waiting=()=>{app.innerHTML=`<div class="hero"><img src="logo.png" alt="Acton Upcountry"></div><div class="card">${status==='removed'?`<h2>Access removed</h2><p>Your access to the Acton Upcountry Parent app has been removed. If you think this is a mistake, email <a href="mailto:actonupcountry@gmail.com">actonupcountry@gmail.com</a>.</p>`:`<h2>Waiting for approval</h2><p>Mahalo for signing up, ${esc(profile?.parent_name||'')}! The school will review your account shortly. You’ll have full access once you're approved.</p><button class="btn alt" id="chk">Check again</button>`}
+  <p class="muted">Signed in as ${esc(session.user.email)}</p><button class="btn danger" id="out">Sign out</button></div>`;
+  const c=$('#chk');if(c)c.onclick=async()=>{await loadUser();route()};$('#out').onclick=async()=>{await sb.auth.signOut();session=null;location.hash='';route()}};
+V.members=async()=>{ if(!isAdmin){location.hash='';return}
+  const {data,error}=await sb.from('profiles').select('id,parent_name,email,phone,students,status,updated_at').order('parent_name');if(error)throw error;
+  const grp=k=>data.filter(x=>x.status===k);
+  const card=x=>`<div class="card"><h3>${esc(x.parent_name||'(no name)')}</h3><div><a href="mailto:${esc(x.email)}">${esc(x.email)}</a>${x.phone?` · ${esc(x.phone)}`:''}</div>${x.students?`<div class="muted">Learner(s): ${esc(x.students)}</div>`:''}
+   ${x.status!=='approved'?`<button class="btn sm" data-st="approved" data-id="${x.id}">Approve</button>`:''}${x.status!=='removed'&&x.id!==session.user.id?`<button class="btn danger sm" data-st="removed" data-id="${x.id}">Remove access</button>`:''}${x.id!==session.user.id?`<button class="btn ghost sm" data-del="${x.id}">Delete account</button>`:''}</div>`;
+  app.innerHTML=[['pending','Waiting for approval'],['approved','Approved'],['removed','Removed']].map(([k,t])=>`<h2>${t} (${grp(k).length})</h2>${grp(k).map(card).join('')||'<p class="muted">None</p>'}`).join('');
+  app.querySelectorAll('[data-st]').forEach(b=>b.onclick=async()=>{const {error}=await sb.from('profiles').update({status:b.dataset.st}).eq('id',b.dataset.id);if(error)return toast(error.message);toast(b.dataset.st==='approved'?'Approved':'Access removed');V.members()});
+  app.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('Permanently delete this account and all its family data?'))return;const {data:r,error}=await sb.functions.invoke('admin-user',{body:{action:'delete',user_id:b.dataset.del}});if(error||r?.error)return toast(r?.error||error.message);toast('Account deleted');V.members()})};
+V.home=async()=>{ try{await getCal()}catch{}
   app.innerHTML=`<div class="hero"><img src="logo.png" alt="Acton Upcountry — Courage • Character • Calling"></div>
   ${(()=>{const n=nextCal();return n?`<a href="#calendar" class="card" style="display:block;text-decoration:none;color:inherit;border-left:6px solid ${n[3]?'var(--ochre)':'var(--rust)'}"><span class="muted">Next up</span><div class="ev-date">${calDate(n)}</div><b>${n[3]?'NO SCHOOL · ':''}${esc(n[2])}</b></a>`:''})()}
   <div class="grid">${TILES.map(([k,ic,t,c])=>`<a class="tile ${c}" href="#${k}"><span class="ic">${ic}</span>${t}</a>`).join('')}</div>
-  <div class="foot">${session?`<p class="muted">Signed in as ${esc(session.user.email)}${isAdmin?' · <b>Admin</b>':''}</p><a class="btn ghost" href="#account">My Account</a>`:`<a class="btn alt" href="#login">Parent Sign In</a>`}
+  <div class="foot">${session?`<p class="muted">Signed in as ${esc(session.user.email)}${isAdmin?' · <b>Admin</b>':''}</p>${isAdmin?'<a class="btn" href="#members">👥 Members (approve / remove)</a>':''}<a class="btn ghost" href="#account">My Account</a>`:`<a class="btn alt" href="#login">Parent Sign In</a>`}
   <p class="muted">683 Naalae Road, Kula, HI · <a href="tel:8083446923">808.344.6923</a></p></div>`};
 
 V.login=(next)=>{
@@ -54,7 +70,7 @@ V.login=(next)=>{
    $('#f').onsubmit=async e=>{e.preventDefault();const d=form(e.target),btn=e.target.querySelector('button');btn.disabled=true;
      try{ if(mode==='up'){const {data,error}=await sb.functions.invoke('signup',{body:d});if(error){let m=error.message;try{m=(await error.context.json()).error}catch{}throw new Error(m)}if(data?.error)throw new Error(data.error)}
        const {error}=await sb.auth.signInWithPassword({email:d.email,password:d.password});if(error)throw error;
-       toast('Welcome!');await loadUser();location.hash=next||'';
+       await loadUser();toast(status==='approved'?'Welcome!':'Account created — waiting for approval');location.hash=next||'';
      }catch(err){toast(err.message);btn.disabled=false}}};
   draw()};
 
@@ -70,16 +86,17 @@ V.account=async()=>{ if(needLogin('account'))return;
   let shared=!!pr.shared;app.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{shared=b.dataset.s==='1';app.querySelectorAll('[data-s]').forEach(x=>x.classList.toggle('on',x===b));$('#vis').textContent=shared?'Other signed-in parents will see this profile in the Parent Directory.':'Only you and school admins can see this profile.'});
   $('#f').onsubmit=async e=>{e.preventDefault();const d={...form(e.target),shared};const {error}=await sb.from('profiles').upsert({id:session.user.id,...d,updated_at:new Date().toISOString()});if(error)return toast(error.message);profile={...profile,...d};toast('Saved')};
   $('#pw').onsubmit=async e=>{e.preventDefault();const {error}=await sb.auth.updateUser({password:form(e.target).password});toast(error?error.message:'Password updated');e.target.reset()};
-  $('#out').onclick=async()=>{await sb.auth.signOut();location.hash=''}};
+  $('#out').onclick=async()=>{await sb.auth.signOut();location.hash='';route()}};
 
 // HANDBOOK
 V.handbook=async(sec)=>{
-  HB=HB||await (await fetch('handbook.json')).json();
+  if(!HB){const {data,error}=await sb.from('handbook_sections').select('*').order('idx');if(error)throw error;HB=data.map(x=>({title:x.title,pages:[x.pages],paras:x.paras}))}
   if(sec!==undefined&&HB[sec]){const s=HB[sec];setBar(s.title);
     app.innerHTML=`<div class="card hb"><h2>${esc(s.title)}</h2>${s.paras.map(hbPara).join('')}<p class="muted">Handbook page ${s.pages.join(', ')}</p></div>
     <div class="row">${sec>0?`<a class="btn ghost sm" href="#handbook/${+sec-1}">‹ Previous</a>`:'<span></span>'}${sec<HB.length-1?`<a class="btn sm" href="#handbook/${+sec+1}">Next ›</a>`:''}</div>`;return}
   app.innerHTML=`<p class="tag">Parent Handbook 2025–26</p><input id="q" type="search" placeholder="Search the handbook…" aria-label="Search handbook">
-   <div id="res"></div><a class="btn alt" href="${PDF}" download>⬇︎ Download the PDF</a>`;
+   <div id="res"></div><button class="btn alt" id="pdf">⬇︎ Download the PDF</button>`;
+  $('#pdf').onclick=async()=>{const {data,error}=await sb.storage.from('private').createSignedUrl('handbook-2025-26.pdf',300,{download:'Acton-Upcountry-Parent-Handbook-2025-26.pdf'});if(error)return toast(error.message);location.href=data.signedUrl};
   const res=$('#res'),q=$('#q');
   const list=()=>`<div class="card toc">${HB.map((s,i)=>`<a href="#handbook/${i}">${esc(s.title)}</a>`).join('')}</div>`;
   res.innerHTML=list();
@@ -90,18 +107,11 @@ V.handbook=async(sec)=>{
 function hbPara(x){if(x.startsWith('## '))return `<p class="cap">${esc(x.slice(3))}</p>`;if(/^[•*\-]\s?/.test(x))return `<p class="li">• ${esc(x.replace(/^[•*\-]\s?/,''))}</p>`;if(/^\d+\.\s?/.test(x))return `<p class="li">${esc(x)}</p>`;if(x===x.toUpperCase()&&x.length<60&&/[A-Z]/.test(x))return `<p class="cap">${esc(x)}</p>`;return `<p>${esc(x)}</p>`}
 
 // PICKUP
-V.pickup=()=>{app.innerHTML=`
- <div class="card"><h2>Drop-off</h2><p class="big">8:30 – 8:55 am</p><p class="muted">Morning launch starts promptly at 9:00 am.</p></div>
- <div class="card"><h2>Pickup</h2><p class="big">2:30 – 2:55 pm</p></div>
- <div class="card"><h2>How it works</h2><ol class="steps">
-  <li>Drive around the <b>cul-de-sac</b>.</li><li>Pull up at the <b>top of the driveway</b>.</li>
-  <li><b>Stay in your vehicle</b> — your Learner hops out (or in). Please say goodbyes in the car.</li>
-  <li>Pickup works the same way: circle the cul-de-sac, stop at the top of the driveway, and stay in your car.</li></ol>
-  <p class="muted">If someone else is picking up, add them to your <a href="#authorized">Authorized Pickup list</a> and tell your Learner.</p></div>
- <a class="btn" href="#attendance">Report an absence or early pickup</a>`};
+V.pickup=async()=>{const {data:pg,error}=await sb.from('pages').select('*').eq('slug','pickup').single();if(error)throw error;
+ app.innerHTML=`<div class="card hb">${pg.subtitle?`<p class="tag">${esc(pg.subtitle)}</p>`:''}${pg.body.split('\n').filter(Boolean).map(hbPara).join('')}</div><a class="btn ghost" href="#authorized">Authorized Pickup list</a><a class="btn" href="#attendance">Report an absence or early pickup</a>`};
 
-V.calendar=()=>{app.innerHTML=`<p class="tag">School Calendar 2026–27</p>
- <div class="card"><h3>Learners come Monday – Thursday</h3><p>Flexible drop-off <b>8:30 – 8:55 am</b><br>Pickup <b>2:30 – 2:55 pm</b></p></div>
+V.calendar=async()=>{await getCal();const {data:ci}=await sb.from('pages').select('*').eq('slug','calendar-intro').single();app.innerHTML=`<p class="tag">${esc(ci?.title||'')}</p>
+ <div class="card"><h3>${esc(ci?.subtitle||'')}</h3><p>${esc(ci?.body||'')}</p></div>
  ${CAL.map(c=>`<div ${c[4]?'onclick="location.hash=\'fair\'"':''} class="card" style="${c[3]?'background:var(--ochre);color:var(--dg)':''}"><div class="ev-date" style="${c[3]?'color:var(--dg)':''}">${calDate(c)}</div><h3>${c[3]?'OFF · ':''}${esc(c[2])}</h3></div>`).join('')}
  <p class="muted"><span class="pill" style="background:var(--ochre)">Golden</span> = no school (days off)</p>`};
 V.fair=async()=>{const {data:pg,error}=await sb.from('pages').select('*').eq('slug','business-fair').single();if(error)throw error;
@@ -187,14 +197,12 @@ V.attendance=async()=>{ if(needLogin('attendance'))return;
   hist()};
 
 // LINKS
-const linkPage=(t,txt,url,btn)=>()=>{app.innerHTML=`<div class="card"><h2>${t}</h2><p>${txt}</p><a class="btn" href="${url}" target="_blank" rel="noopener">${btn} ↗</a></div>`};
-V.tuition=linkPage('Tuition','Tuition is managed through TUIO. Sign in with your Google account to view invoices, pay, set up autopay and download receipts.',LINKS.tuio,'Open TUIO parent login');
-V.parents=linkPage('Acton Academy Parents','Laura Sandefer’s blog for Acton parents — ideas for bringing the Acton way of questions and choices home.',LINKS.parents,'Visit actonacademyparents.com');
-V.journey=linkPage('Journey Tracker','Follow your Learner’s goals, badges and progress. Ask your Learner to give you a tour!',LINKS.journey,'Get Journey Tracker on the App Store');
+const linkPage=slug=>async()=>{const {data:l,error}=await sb.from('links').select('*').eq('slug',slug).single();if(error)throw error;app.innerHTML=`<div class="card"><h2>${esc(l.title)}</h2><p>${esc(l.description)}</p><a class="btn" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.button||'Open')} ↗</a></div>`};
+V.tuition=linkPage('tuition');V.parents=linkPage('parents');V.journey=linkPage('journey');
 
 async function loadUser(){const {data}=await sb.auth.getSession();session=data.session;isAdmin=false;profile=null;
-  if(session){const [{data:p},{data:a}]=await Promise.all([sb.from('profiles').select('*').eq('id',session.user.id).maybeSingle(),sb.rpc('is_admin')]);profile=p;isAdmin=!!a}}
-sb.auth.onAuthStateChange((ev)=>{if(ev==='SIGNED_OUT'){session=null;isAdmin=false;profile=null}});
+  status=null;if(session){const [{data:p},{data:a},{data:st}]=await Promise.all([sb.from('profiles').select('*').eq('id',session.user.id).maybeSingle(),sb.rpc('is_admin'),sb.rpc('my_status')]);profile=p;isAdmin=!!a;status=st||'pending'}}
+sb.auth.onAuthStateChange((ev)=>{if(ev==='SIGNED_OUT'){session=null;isAdmin=false;profile=null;status=null;HB=null;CAL=null}});
 window.addEventListener('hashchange',route);
 (async()=>{await loadUser();route()})();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
