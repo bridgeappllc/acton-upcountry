@@ -52,7 +52,7 @@ V.members=async()=>{ if(!isAdmin){location.hash='';return}
   app.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('Permanently delete this account and all its family data?'))return;const {data:r,error}=await sb.functions.invoke('admin-user',{body:{action:'delete',user_id:b.dataset.del}});if(error||r?.error)return toast(r?.error||error.message);toast('Account deleted');V.members()})};
 V.home=async()=>{ try{await getCal()}catch{}
   app.innerHTML=`<div class="hero"><img src="logo.png" alt="Acton Upcountry — Courage • Character • Calling"></div>
-  ${(()=>{const n=nextCal();return n?`<a href="#calendar" class="card" style="display:block;text-decoration:none;color:inherit;border-left:6px solid ${n[3]?'var(--ochre)':'var(--rust)'}"><span class="muted">Next up</span><div class="ev-date">${calDate(n)}</div><b>${n[3]?'NO LEARNING CENTER · ':''}${esc(n[2])}</b></a>`:''})()}
+  ${(()=>{const n=nextCal();return n?`<a href="#calendar" class="card" style="display:block;text-decoration:none;color:inherit;border-left:6px solid ${n[3]?'var(--ochre)':'var(--rust)'}"><span class="muted">Next up</span><div class="ev-date">${calDate(n)}</div><b>${n[3]?'DAY OFF · ':''}${esc(n[2])}</b></a>`:''})()}
   <div class="grid">${TILES.map(([k,ic,t,c])=>`<a class="tile ${c}" href="#${k}"><span class="ic">${ic}</span>${t}</a>`).join('')}</div>
   <div class="foot">${session?`<p class="muted">Signed in as ${esc(session.user.email)}${isAdmin?' · <b>Admin</b>':''}</p>${isAdmin?'<a class="btn" href="#members">👥 Members (approve / remove)</a>':''}<a class="btn ghost" href="#account">My Account</a>`:`<a class="btn alt" href="#login">Parent Sign In</a>`}
   <p class="muted">683 Naalae Road, Kula, HI · <a href="tel:8083446923">808.344.6923</a></p></div>`};
@@ -113,7 +113,7 @@ V.pickup=async()=>{const {data:pg,error}=await sb.from('pages').select('*').eq('
 V.calendar=async()=>{await getCal();const {data:ci}=await sb.from('pages').select('*').eq('slug','calendar-intro').single();app.innerHTML=`<p class="tag">${esc(ci?.title||'')}</p>
  <div class="card"><h3>${esc(ci?.subtitle||'')}</h3><p>${esc(ci?.body||'')}</p></div>
  ${CAL.map(c=>`<div ${c[4]?'onclick="location.hash=\'fair\'"':''} class="card" style="${c[3]?'background:var(--ochre);color:var(--dg)':''}"><div class="ev-date" style="${c[3]?'color:var(--dg)':''}">${calDate(c)}</div><h3>${c[3]?'OFF · ':''}${esc(c[2])}</h3></div>`).join('')}
- <p class="muted"><span class="pill" style="background:var(--ochre)">Golden</span> = no learning center (days off)</p>`};
+ <p class="muted"><span class="pill" style="background:var(--ochre)">Golden</span> = Day Off</p>`};
 V.fair=async()=>{const {data:pg,error}=await sb.from('pages').select('*').eq('slug','business-fair').single();if(error)throw error;
  app.innerHTML=`<div class="card"><h2>${esc(pg.title)}</h2>${pg.subtitle?`<div class="ev-date">${esc(pg.subtitle)}</div>`:''}<p style="white-space:pre-wrap">${esc(pg.body)}</p></div><a class="btn ghost" href="#calendar">See the Learning Center Calendar</a>
  ${isAdmin?`<div class="card"><h3>Edit this page (admin)</h3><form id="f"><label>Title</label><input name="title" required value="${esc(pg.title)}"><label>Date line</label><input name="subtitle" value="${esc(pg.subtitle)}"><label>Description</label><textarea name="body" style="min-height:160px">${esc(pg.body)}</textarea><button class="btn">Save changes</button></form></div>`:''}`;
