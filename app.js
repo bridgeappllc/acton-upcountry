@@ -25,7 +25,7 @@ $('#back').onclick=()=>{history.length>1?history.back():location.hash=''};
 
 async function route(){
   const [r,arg]=(location.hash.slice(1)||'home').split('/');window.scrollTo(0,0);
-  if(session){const {data:st}=await sb.rpc('my_status');if(st&&st!==status){status=st}}
+  if(session){const {data:st}=await sb.rpc('my_status');if(st&&st!==status){status=st;CAL=null;HB=null}}
   const open=['login','account'];
   if(!session&&r!=='login'){setBar('');return V.signedOut()}
   if(session&&status!=='approved'&&!open.includes(r)){setBar('');return V.waiting()}
