@@ -11,14 +11,14 @@ function form(el){return Object.fromEntries([...new FormData(el)].map(([k,v])=>[
 
 const TILES=[
  ['handbook','📖','Parent Handbook','t1'],['pickup','🚗','Pickup & Drop-off','t2'],
- ['bulletin','📌','Bulletin Board','t4'],['calendar','📅','School Calendar','t1'],['fair','💡','Business Fair','t2'],['attendance','🗓️','Attendance','t3'],
+ ['bulletin','📌','Bulletin Board','t4'],['calendar','📅','Learning Center Calendar','t1'],['fair','💡','Business Fair','t2'],['attendance','🗓️','Attendance','t3'],
  ['emergency','🚑','Emergency Contacts','t5'],['authorized','✅','Authorized Pickup','t1'],
  ['carpool','🚙','Carpool','t2'],['directory','👥','Parent Directory','t3'],['tuition','💳','Tuition (TUIO)','t4'],
  ['parents','🦉','Acton Parents','t3'],['journey','🧭','Journey Tracker','t5']];
 const calDate=c=>c[4]||(fmtDate(c[0])+(c[1]?' – '+fmtDate(c[1]):''));
 let CAL=null;const getCal=async()=>{if(!CAL){const {data,error}=await sb.from('calendar_items').select('*').order('start_date');if(error)throw error;CAL=data.map(c=>[c.start_date,c.end_date,c.title,c.is_off,c.label])}return CAL};
 const nextCal=()=>(CAL||[]).find(c=>(c[1]||c[0])>=today()&&!c[4]);
-const TITLES=Object.fromEntries(TILES.map(t=>[t[0],t[2]]));TITLES.login='Sign In';TITLES.fair='Children’s Business Fair';TITLES.calendar='School Calendar 2026–27';TITLES.account='My Account';TITLES.members='Members';TITLES.directory='Parent Directory';
+const TITLES=Object.fromEntries(TILES.map(t=>[t[0],t[2]]));TITLES.login='Sign In';TITLES.fair='Children’s Business Fair';TITLES.calendar='Learning Center Calendar 2026–27';TITLES.account='My Account';TITLES.members='Members';TITLES.directory='Parent Directory';
 
 function setBar(title){const b=$('#bar');if(!title){b.classList.add('hidden');return}b.classList.remove('hidden');$('#title').textContent=title}
 $('#back').onclick=()=>{history.length>1?history.back():location.hash=''};
@@ -37,9 +37,9 @@ function needLogin(next){ if(session) return false;
 
 const V={};
 V.signedOut=()=>{app.innerHTML=`<div class="hero"><img src="logo.png" alt="Acton Upcountry — Courage • Character • Calling"></div>
-  <div class="card"><h2>Welcome, Acton Upcountry families</h2><p>This app is private to our school community. Sign in, or create an account and the school will approve it.</p>
+  <div class="card"><h2>Welcome, Acton Upcountry families</h2><p>This app is private to our learning center community. Sign in, or create an account and the learning center will approve it.</p>
   <a class="btn" href="#login">Sign in / Create account</a></div>`};
-V.waiting=()=>{app.innerHTML=`<div class="hero"><img src="logo.png" alt="Acton Upcountry"></div><div class="card">${status==='removed'?`<h2>Access removed</h2><p>Your access to the Acton Upcountry Parent app has been removed. If you think this is a mistake, email <a href="mailto:actonupcountry@gmail.com">actonupcountry@gmail.com</a>.</p>`:`<h2>Waiting for approval</h2><p>Mahalo for signing up, ${esc(profile?.parent_name||'')}! The school will review your account shortly. You’ll have full access once you're approved.</p><button class="btn alt" id="chk">Check again</button>`}
+V.waiting=()=>{app.innerHTML=`<div class="hero"><img src="logo.png" alt="Acton Upcountry"></div><div class="card">${status==='removed'?`<h2>Access removed</h2><p>Your access to the Acton Upcountry Parent app has been removed. If you think this is a mistake, email <a href="mailto:actonupcountry@gmail.com">actonupcountry@gmail.com</a>.</p>`:`<h2>Waiting for approval</h2><p>Mahalo for signing up, ${esc(profile?.parent_name||'')}! The learning center will review your account shortly. You’ll have full access once you're approved.</p><button class="btn alt" id="chk">Check again</button>`}
   <p class="muted">Signed in as ${esc(session.user.email)}</p><button class="btn danger" id="out">Sign out</button></div>`;
   const c=$('#chk');if(c)c.onclick=async()=>{await loadUser();route()};$('#out').onclick=async()=>{await sb.auth.signOut();session=null;location.hash='';route()}};
 V.members=async()=>{ if(!isAdmin){location.hash='';return}
@@ -52,7 +52,7 @@ V.members=async()=>{ if(!isAdmin){location.hash='';return}
   app.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('Permanently delete this account and all its family data?'))return;const {data:r,error}=await sb.functions.invoke('admin-user',{body:{action:'delete',user_id:b.dataset.del}});if(error||r?.error)return toast(r?.error||error.message);toast('Account deleted');V.members()})};
 V.home=async()=>{ try{await getCal()}catch{}
   app.innerHTML=`<div class="hero"><img src="logo.png" alt="Acton Upcountry — Courage • Character • Calling"></div>
-  ${(()=>{const n=nextCal();return n?`<a href="#calendar" class="card" style="display:block;text-decoration:none;color:inherit;border-left:6px solid ${n[3]?'var(--ochre)':'var(--rust)'}"><span class="muted">Next up</span><div class="ev-date">${calDate(n)}</div><b>${n[3]?'NO SCHOOL · ':''}${esc(n[2])}</b></a>`:''})()}
+  ${(()=>{const n=nextCal();return n?`<a href="#calendar" class="card" style="display:block;text-decoration:none;color:inherit;border-left:6px solid ${n[3]?'var(--ochre)':'var(--rust)'}"><span class="muted">Next up</span><div class="ev-date">${calDate(n)}</div><b>${n[3]?'NO LEARNING CENTER · ':''}${esc(n[2])}</b></a>`:''})()}
   <div class="grid">${TILES.map(([k,ic,t,c])=>`<a class="tile ${c}" href="#${k}"><span class="ic">${ic}</span>${t}</a>`).join('')}</div>
   <div class="foot">${session?`<p class="muted">Signed in as ${esc(session.user.email)}${isAdmin?' · <b>Admin</b>':''}</p>${isAdmin?'<a class="btn" href="#members">👥 Members (approve / remove)</a>':''}<a class="btn ghost" href="#account">My Account</a>`:`<a class="btn alt" href="#login">Parent Sign In</a>`}
   <p class="muted">683 Naalae Road, Kula, HI · <a href="tel:8083446923">808.344.6923</a></p></div>`};
@@ -65,7 +65,7 @@ V.login=(next)=>{
    <label>Email</label><input name="email" type="email" required autocomplete="email" inputmode="email">
    <label>Password</label><input name="password" type="password" required minlength="8" autocomplete="${mode==='up'?'new-password':'current-password'}">
    <button class="btn">${mode==='up'?'Create account':'Sign in'}</button></form>
-   <p class="muted">${mode==='up'?'Use at least 8 characters. Only you (and school admins) can see your family’s information.':'Forgot your password? Email <a href="mailto:actonupcountry@gmail.com">actonupcountry@gmail.com</a> and we’ll reset it.'}</p></div>`;
+   <p class="muted">${mode==='up'?'Use at least 8 characters. Only you (and learning center admins) can see your family’s information.':'Forgot your password? Email <a href="mailto:actonupcountry@gmail.com">actonupcountry@gmail.com</a> and we’ll reset it.'}</p></div>`;
    app.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{mode=b.dataset.m;draw()});
    $('#f').onsubmit=async e=>{e.preventDefault();const d=form(e.target),btn=e.target.querySelector('button');btn.disabled=true;
      try{ if(mode==='up'){const {data,error}=await sb.functions.invoke('signup',{body:d});if(error){let m=error.message;try{m=(await error.context.json()).error}catch{}throw new Error(m)}if(data?.error)throw new Error(data.error)}
@@ -79,11 +79,11 @@ V.account=async()=>{ if(needLogin('account'))return;
   <label>Phone</label><input name="phone" type="tel" value="${esc(pr.phone)}"><label>Email</label><input name="email" type="email" value="${esc(pr.email||session.user.email)}"><label>My Learner(s)</label><input name="students" placeholder="e.g. Kai, Leilani" value="${esc(pr.students)}">
   <label>Note (optional)</label><textarea name="note" placeholder="e.g. Happy to help with carpools">${esc(pr.note)}</textarea>
   <label>Parent Directory visibility</label><div class="seg"><button type="button" data-s="0" class="${pr.shared?'':'on'}">🔒 Private</button><button type="button" data-s="1" class="${pr.shared?'on':''}">👥 Shared</button></div>
-  <p class="muted" id="vis">${pr.shared?'Other signed-in parents can see this profile in the Parent Directory.':'Only you and school admins can see this profile.'}</p>
+  <p class="muted" id="vis">${pr.shared?'Other signed-in parents can see this profile in the Parent Directory.':'Only you and learning center admins can see this profile.'}</p>
   <button class="btn">Save</button></form></div>
   <div class="card"><h3>Change password</h3><form id="pw"><input name="password" type="password" minlength="8" required placeholder="New password"><button class="btn alt">Update password</button></form></div>
   <button class="btn danger" id="out">Sign out</button>`;
-  let shared=!!pr.shared;app.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{shared=b.dataset.s==='1';app.querySelectorAll('[data-s]').forEach(x=>x.classList.toggle('on',x===b));$('#vis').textContent=shared?'Other signed-in parents will see this profile in the Parent Directory.':'Only you and school admins can see this profile.'});
+  let shared=!!pr.shared;app.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{shared=b.dataset.s==='1';app.querySelectorAll('[data-s]').forEach(x=>x.classList.toggle('on',x===b));$('#vis').textContent=shared?'Other signed-in parents will see this profile in the Parent Directory.':'Only you and learning center admins can see this profile.'});
   $('#f').onsubmit=async e=>{e.preventDefault();const d={...form(e.target),shared};const {error}=await sb.from('profiles').upsert({id:session.user.id,...d,updated_at:new Date().toISOString()});if(error)return toast(error.message);profile={...profile,...d};toast('Saved')};
   $('#pw').onsubmit=async e=>{e.preventDefault();const {error}=await sb.auth.updateUser({password:form(e.target).password});toast(error?error.message:'Password updated');e.target.reset()};
   $('#out').onclick=async()=>{await sb.auth.signOut();location.hash='';route()}};
@@ -113,9 +113,9 @@ V.pickup=async()=>{const {data:pg,error}=await sb.from('pages').select('*').eq('
 V.calendar=async()=>{await getCal();const {data:ci}=await sb.from('pages').select('*').eq('slug','calendar-intro').single();app.innerHTML=`<p class="tag">${esc(ci?.title||'')}</p>
  <div class="card"><h3>${esc(ci?.subtitle||'')}</h3><p>${esc(ci?.body||'')}</p></div>
  ${CAL.map(c=>`<div ${c[4]?'onclick="location.hash=\'fair\'"':''} class="card" style="${c[3]?'background:var(--ochre);color:var(--dg)':''}"><div class="ev-date" style="${c[3]?'color:var(--dg)':''}">${calDate(c)}</div><h3>${c[3]?'OFF · ':''}${esc(c[2])}</h3></div>`).join('')}
- <p class="muted"><span class="pill" style="background:var(--ochre)">Golden</span> = no school (days off)</p>`};
+ <p class="muted"><span class="pill" style="background:var(--ochre)">Golden</span> = no learning center (days off)</p>`};
 V.fair=async()=>{const {data:pg,error}=await sb.from('pages').select('*').eq('slug','business-fair').single();if(error)throw error;
- app.innerHTML=`<div class="card"><h2>${esc(pg.title)}</h2>${pg.subtitle?`<div class="ev-date">${esc(pg.subtitle)}</div>`:''}<p style="white-space:pre-wrap">${esc(pg.body)}</p></div><a class="btn ghost" href="#calendar">See the School Calendar</a>
+ app.innerHTML=`<div class="card"><h2>${esc(pg.title)}</h2>${pg.subtitle?`<div class="ev-date">${esc(pg.subtitle)}</div>`:''}<p style="white-space:pre-wrap">${esc(pg.body)}</p></div><a class="btn ghost" href="#calendar">See the Learning Center Calendar</a>
  ${isAdmin?`<div class="card"><h3>Edit this page (admin)</h3><form id="f"><label>Title</label><input name="title" required value="${esc(pg.title)}"><label>Date line</label><input name="subtitle" value="${esc(pg.subtitle)}"><label>Description</label><textarea name="body" style="min-height:160px">${esc(pg.body)}</textarea><button class="btn">Save changes</button></form></div>`:''}`;
  if(isAdmin)$('#f').onsubmit=async e=>{e.preventDefault();const {error}=await sb.from('pages').update({...form(e.target),updated_at:new Date().toISOString()}).eq('slug','business-fair');if(error)return toast(error.message);toast('Saved');V.fair()}};
 V.directory=async()=>{ if(needLogin('directory'))return;
@@ -152,7 +152,7 @@ async function familyList(o){ if(needLogin(o.route))return;
     const {error}=await q;if(error)return toast(error.message);toast('Saved');$('#cancel').onclick();load()};
   await load()}
 V.emergency=()=>familyList({route:'emergency',table:'emergency_contacts',noun:'emergency contact',
-  intro:'Who should we call if we can’t reach you? Add one or more contacts for each of your Learners. Only you and school admins can see these.',
+  intro:'Who should we call if we can’t reach you? Add one or more contacts for each of your Learners. Only you and learning center admins can see these.',
   fields:[['student_name','Learner’s name','text',1],['contact_name','Contact name','text',1],['relationship','Relationship (e.g. Grandma)'],['phone','Phone','tel',1],['alt_phone','Alternate phone','tel'],['notes','Notes (allergies, medical info, etc.)','textarea']],
   show:x=>`<span class="pill">${esc(x.student_name)}</span><h3>${esc(x.contact_name)}</h3><div>${esc(x.relationship||'')}</div><div><a href="tel:${esc(x.phone)}">${esc(x.phone)}</a>${x.alt_phone?` · <a href="tel:${esc(x.alt_phone)}">${esc(x.alt_phone)}</a>`:''}</div>${x.notes?`<p class="muted">${esc(x.notes)}</p>`:''}`});
 V.authorized=()=>familyList({route:'authorized',table:'authorized_pickups',noun:'authorized person',
@@ -191,7 +191,7 @@ V.attendance=async()=>{ if(needLogin('attendance'))return;
     const row={...d,kind,parent_name:profile?.parent_name||null,parent_email:session.user.email};
     const {data,error}=await sb.from('attendance').insert(row).select().single();if(error){btn.disabled=false;return toast(error.message)}
     const {data:r,error:fe}=await sb.functions.invoke('attendance-email',{body:{id:data.id}});
-    toast(!fe&&r?.ok?'Submitted — the school has been emailed. Mahalo!':'Saved. (Email notice could not be sent — please also text the Guide.)');hist()};
+    toast(!fe&&r?.ok?'Submitted — the learning center has been emailed. Mahalo!':'Saved. (Email notice could not be sent — please also text the Guide.)');hist()};
   const hist=async()=>{const {data,error}=await sb.from('attendance').select('*').order('start_date',{ascending:false}).limit(isAdmin?100:30);if(error)throw error;
     $('#hist').innerHTML=data.length?data.map(a=>`<div class="card"><span class="pill">${a.kind==='absence'?'Absence':'Early pickup'}</span> ${a.emailed_at?'<span class="muted">✉︎ emailed</span>':''}<h3>${esc(a.student_name)}</h3><div>${fmtDate(a.start_date)}${a.end_date&&a.end_date!==a.start_date?' – '+fmtDate(a.end_date):''}${a.pickup_time?' · '+esc(a.pickup_time):''}${a.pickup_person?' · by '+esc(a.pickup_person):''}</div>${a.reason?`<p class="muted">${esc(a.reason)}</p>`:''}${isAdmin&&a.user_id!==session.user.id?`<p class="muted">From ${esc(a.parent_name||'')} ${esc(a.parent_email||'')}</p>`:''}</div>`).join(''):'<div class="card">Nothing submitted yet.</div>'};
   hist()};
